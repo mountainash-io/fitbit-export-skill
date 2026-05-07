@@ -18,10 +18,44 @@ Guides the user through setup, authentication, and extraction with checkpoint/re
 
 ---
 
+## Constants
+
+```pseudocode
+UVX_PREFIX = "uvx --from git+https://github.com/mountainash-io/fitbit-export fitbit-export"
+TOKEN_DIR  = "~/.fitbit-export"
+ALL_TYPES  = ["spo2", "breathing_rate", "skin_temperature", "hrv",
+              "weight", "sleep", "heart_rate_summary", "nutrition",
+              "activities", "activity_tcx", "daily_summary",
+              "heart_rate_intraday"]
+```
+
+## State
+
+All phases read and write from this shared state, initialised at startup:
+
+```pseudocode
+state = {
+  output_dir: null,     # Path — where export data is saved
+  users: [],            # list[{user_id: str, display_name: str}] — authenticated accounts
+  selected_users: [],   # list[{user_id: str, display_name: str}] — accounts to export
+  type_flag: null,      # str — CLI flag: "--all" or "--types spo2,weight,..."
+}
+```
+
+## Helper: RUN
+
+All phases use this helper to invoke CLI commands via uvx:
+
+```pseudocode
+RUN(args):
+  RETURN Bash(UVX_PREFIX + " " + args)
+```
+
+---
+
 ## Phase 0: Bootstrap
 
-Ensure `uv` is available. All commands use `uvx` to run `fitbit-export` directly
-from GitHub — no local clone or venv needed.
+Ensure `uv` is available and `fitbit-export` is runnable.
 
 ```pseudocode
 BOOTSTRAP():
@@ -30,8 +64,7 @@ BOOTSTRAP():
     DISPLAY "uv is required. Install: curl -LsSf https://astral.sh/uv/install.sh | sh"
     HALT
 
-  # Verify fitbit-export is runnable via uvx
-  version_check = Bash("uvx --from git+https://github.com/mountainash-io/fitbit-export fitbit-export --help")
+  version_check = RUN("--help")
   IF version_check FAILS:
     DISPLAY "Failed to run fitbit-export via uvx. Check network connectivity and try again."
     HALT
@@ -39,24 +72,15 @@ BOOTSTRAP():
   DISPLAY "Environment ready."
 ```
 
-### Helper: RUN
-
-All phases use this helper to invoke CLI commands via uvx:
-
-```pseudocode
-RUN(args):
-  RETURN Bash("uvx --from git+https://github.com/mountainash-io/fitbit-export fitbit-export " + args)
-```
-
 ---
 
 ## Phase 1: Output Directory
 
-Ask the user where to store the export.
+Ask the user where to store the export. Sets `state.output_dir`.
 
 ```pseudocode
-OUTPUT_DIR():
-  output = AskUserQuestion(
+CHOOSE_OUTPUT_DIR():
+  selection = AskUserQuestion(
     question: "Where should the exported Fitbit data be saved?",
     header: "Output",
     options: [
@@ -67,22 +91,24 @@ OUTPUT_DIR():
     multiSelect: false
   )
 
-  IF output == "Custom path":
-    WAIT for user input
+  IF selection == "Custom path":
+    WAIT for user to provide path
+    state.output_dir = user_provided_path
+  ELSE:
+    state.output_dir = selection
 
-  RUN("config --output {output_dir}")
-  RETURN output_dir
+  RUN("config --output " + state.output_dir)
 ```
 
 ---
 
 ## Phase 2: Authentication
 
-Discover existing users or authenticate new ones.
+Discover existing users or authenticate new ones. Sets `state.users`.
 
 ```pseudocode
-AUTHENTICATE(output_dir):
-  tokens = Bash("ls ~/.fitbit-export/tokens-*.json 2>/dev/null")
+AUTHENTICATE():
+  tokens = Bash("ls " + TOKEN_DIR + "/tokens-*.json 2>/dev/null")
 
   IF tokens IS empty:
     DISPLAY "No Fitbit accounts found. Let's connect your first account."
@@ -106,12 +132,12 @@ AUTHENTICATE(output_dir):
       HALT
 
     RUN("add-user")
-    users = DISCOVER_USERS()
+    state.users = DISCOVER_USERS()
 
   ELSE:
-    users = DISCOVER_USERS()
-    DISPLAY "Found {len(users)} authenticated Fitbit account(s):"
-    FOR user IN users:
+    state.users = DISCOVER_USERS()
+    DISPLAY "Found {len(state.users)} authenticated Fitbit account(s):"
+    FOR user IN state.users:
       DISPLAY "  - {user.display_name} ({user.user_id})"
 
     add_more = AskUserQuestion(
@@ -127,14 +153,17 @@ AUTHENTICATE(output_dir):
     IF add_more == "Yes, add another":
       DISPLAY "Log out of fitbit.com first if adding a different account."
       RUN("add-user")
-      users = DISCOVER_USERS()
-
-  RETURN users
+      state.users = DISCOVER_USERS()
 
 
 DISCOVER_USERS():
-  result = RUN("list-users")
-  PARSE user_id and display_name from output
+  # list-users outputs lines like: "  Alice (ABC123)  4/12"
+  output = RUN("list-users")
+  users = []
+  FOR line IN output.lines:
+    MATCH line against pattern: "{name} ({user_id})"
+    IF match:
+      users.append({ user_id: match.user_id, display_name: match.name })
   RETURN users
 ```
 
@@ -142,34 +171,37 @@ DISCOVER_USERS():
 
 ## Phase 3: Select Users
 
-Let the user choose which accounts to export.
+Let the user choose which accounts to export. Sets `state.selected_users`.
 
 ```pseudocode
-SELECT_USERS(users):
-  IF len(users) == 1:
-    RETURN users
+SELECT_USERS():
+  IF len(state.users) == 1:
+    state.selected_users = state.users
+    RETURN
+
+  options = [{ label: "All accounts", description: "Export all {len(state.users)} accounts" }]
+  FOR user IN state.users:
+    options.append({ label: "{user.display_name} ({user.user_id})", description: "" })
 
   selection = AskUserQuestion(
     question: "Which accounts do you want to export?",
     header: "Accounts",
-    options: [
-      { label: "All accounts", description: "Export all {len(users)} accounts" },
-      -- dynamically add one option per user --
-    ],
+    options: options,
     multiSelect: false
   )
 
   IF selection == "All accounts":
-    RETURN users
+    state.selected_users = state.users
   ELSE:
-    RETURN [selected_user]
+    matched = [u FOR u IN state.users IF "{u.display_name} ({u.user_id})" == selection]
+    state.selected_users = matched
 ```
 
 ---
 
 ## Phase 4: Select Data Types
 
-Let the user choose which data types to export.
+Let the user choose which data types to export. Sets `state.type_flag`.
 
 ```pseudocode
 SELECT_TYPES():
@@ -196,11 +228,11 @@ SELECT_TYPES():
   )
 
   IF "All types" IN selection:
-    RETURN "--all"
+    state.type_flag = "--all"
   ELIF "Quick (light API usage)" IN selection:
-    RETURN "--types spo2,breathing_rate,skin_temperature,hrv,weight,sleep"
+    state.type_flag = "--types spo2,breathing_rate,skin_temperature,hrv,weight,sleep"
   ELSE:
-    RETURN "--types " + ",".join(selection)
+    state.type_flag = "--types " + ",".join(selection)
 ```
 
 ---
@@ -210,34 +242,37 @@ SELECT_TYPES():
 Run the extraction with progress monitoring.
 
 ```pseudocode
-EXTRACT(output_dir, users, type_flag):
-  FOR user IN users:
+EXTRACT():
+  FOR user IN state.selected_users:
     DISPLAY "Exporting {user.display_name} ({user.user_id})..."
     DISPLAY ""
 
-    # Check for existing checkpoint
-    user_dir = "{output_dir}/{user.user_id}-{user.first_name}"
-    checkpoint = Read("{user_dir}/.checkpoint.json")
+    # Derive user directory name (matches CLI convention: "{user_id}-{first_name_lower}")
+    first_name = user.display_name.split()[0].lower()
+    user_dir = state.output_dir + "/" + user.user_id + "-" + first_name
 
-    IF checkpoint EXISTS:
-      completed = checkpoint.completed
-      in_progress = checkpoint.in_progress
+    # Check for existing checkpoint
+    checkpoint_path = user_dir + "/.checkpoint.json"
+    checkpoint_raw = Read(checkpoint_path)
+
+    IF checkpoint_raw IS NOT empty:
+      checkpoint = JSON.parse(checkpoint_raw)
+      completed = checkpoint.completed OR []
+      in_progress = checkpoint.in_progress OR {}
       DISPLAY "Resuming previous export."
       DISPLAY "  Already completed: {', '.join(completed)}"
-      IF in_progress:
-        FOR dtype, progress IN in_progress:
-          DISPLAY "  In progress: {dtype} (last: {progress.last_completed_date})"
+      FOR dtype, progress IN in_progress:
+        last_date = progress.last_completed_date OR "unknown"
+        DISPLAY "  In progress: {dtype} (last: {last_date})"
       DISPLAY ""
 
     # Run the export
     result = RUN(
-      "export {type_flag} --user {user.user_id} --output {output_dir}",
+      "export {state.type_flag} --user {user.user_id} --output {state.output_dir}",
       timeout: 600000  # 10 minutes max per run
     )
 
     DISPLAY result
-
-    # Check outcome
     ANALYSE_RESULT(result, user_dir)
 ```
 
@@ -249,19 +284,15 @@ Parse the export result and advise the user on next steps.
 
 ```pseudocode
 ANALYSE_RESULT(result, user_dir):
-  checkpoint = Read("{user_dir}/.checkpoint.json")
+  checkpoint_raw = Read(user_dir + "/.checkpoint.json")
 
-  IF checkpoint IS null:
+  IF checkpoint_raw IS empty:
     DISPLAY "Export may have failed before writing any data. Check the output above."
     RETURN
 
-  completed = checkpoint.completed
-  all_types = ["spo2", "breathing_rate", "skin_temperature", "hrv",
-               "weight", "sleep", "heart_rate_summary", "nutrition",
-               "activities", "activity_tcx", "daily_summary",
-               "heart_rate_intraday"]
-
-  remaining = [t for t IN all_types IF t NOT IN completed]
+  checkpoint = JSON.parse(checkpoint_raw)
+  completed = checkpoint.completed OR []
+  remaining = [t FOR t IN ALL_TYPES IF t NOT IN completed]
 
   IF len(remaining) == 0:
     DISPLAY ""
@@ -279,12 +310,12 @@ ANALYSE_RESULT(result, user_dir):
     DISPLAY "Remaining: {', '.join(remaining)}"
     DISPLAY ""
 
-    IF "heart_rate_intraday" IN remaining:
-      IF "heart_rate_intraday" IN checkpoint.in_progress:
-        last_date = checkpoint.in_progress["heart_rate_intraday"]["last_completed_date"]
-        DISPLAY "Intraday HR progress: extracted through {last_date}"
-        DISPLAY "This is the largest dataset — it takes ~32 hours for 13 years of data."
-        DISPLAY ""
+    in_progress = checkpoint.in_progress OR {}
+    IF "heart_rate_intraday" IN remaining AND "heart_rate_intraday" IN in_progress:
+      last_date = in_progress["heart_rate_intraday"].last_completed_date OR "unknown"
+      DISPLAY "Intraday HR progress: extracted through {last_date}"
+      DISPLAY "This is the largest dataset — it takes ~32 hours for 13 years of data."
+      DISPLAY ""
 
     DISPLAY "Run this skill again in about 1 hour when the rate limit resets."
     DISPLAY "Progress is saved — it will pick up exactly where it left off."
@@ -315,9 +346,9 @@ MAIN():
   DISPLAY ""
 
   BOOTSTRAP()
-  output_dir = OUTPUT_DIR()
-  users      = AUTHENTICATE(output_dir)
-  selected   = SELECT_USERS(users)
-  type_flag  = SELECT_TYPES()
-  EXTRACT(output_dir, selected, type_flag)
+  CHOOSE_OUTPUT_DIR()
+  AUTHENTICATE()
+  SELECT_USERS()
+  SELECT_TYPES()
+  EXTRACT()
 ```
