@@ -22,7 +22,8 @@ npx skills add mountainash-io/fitbit-export-skill -g
 
 ## Requirements
 
-- [uv](https://docs.astral.sh/uv/) — the only prerequisite
+- [Node.js](https://nodejs.org/) (v16+) — provides `npx` for skill installation. Install via [nvm](https://github.com/nvm-sh/nvm) (recommended) or [nodejs.org](https://nodejs.org/).
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) — Python package runner used by the skill. Install: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - **Port 8080 available locally** — authentication runs a temporary server on `localhost:8080` for the OAuth callback. The skill must run on a machine with a browser and local network access (not in a remote/cloud sandbox like claude.ai).
 
 ## How it works
