@@ -227,24 +227,9 @@ Let the user choose which data types to export. Sets `state.type_flag`.
 
 ```pseudocode
 SELECT_TYPES():
-  scope = AskUserQuestion(
+  chosen = AskUserQuestion(
     question: "Which data types do you want to export?",
     header: "Data Types",
-    options: [
-      { label: "Everything", description: "Export all 12 data types (recommended for full backup)" },
-      { label: "Let me choose", description: "Pick specific types from the list" }
-    ],
-    multiSelect: false
-  )
-
-  IF scope == "Everything":
-    state.type_flag = "--all"
-    RETURN
-
-  # Present types grouped by user value, most useful first
-  chosen = AskUserQuestion(
-    question: "Select the data types to export (pick one or more):",
-    header: "Types",
     options: [
       { label: "sleep",                description: "Sleep sessions with stages (deep, light, REM)" },
       { label: "activities",            description: "All logged exercises and workouts" },
