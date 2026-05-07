@@ -2,7 +2,23 @@
 
 LLM skill for extracting all your Fitbit data before the API shuts down in September 2026.
 
-This skill guides an LLM agent through the full export workflow: authentication, user selection, data extraction with progress tracking, and checkpoint/resume for rate-limited sessions.
+This skill guides an LLM agent through the full export workflow: authentication, data type selection, extraction with progress tracking, and checkpoint/resume for rate-limited sessions.
+
+## Install
+
+```bash
+npx skills add mountainash-io/fitbit-export-skill
+```
+
+This installs to Claude Code, Cursor, Codex, and 50+ other agents. Use flags to target specific agents:
+
+```bash
+# Install to a specific agent
+npx skills add mountainash-io/fitbit-export-skill -a claude-code
+
+# Install globally (available across all projects)
+npx skills add mountainash-io/fitbit-export-skill -g
+```
 
 ## How it works
 
