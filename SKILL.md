@@ -288,7 +288,9 @@ EXTRACT():
     )
 
     DISPLAY result
-    ANALYSE_RESULT(result, user_dir)
+    outcome = ANALYSE_RESULT(result, user_dir)
+
+  RETURN outcome  # "complete", "rate_limited", or "partial"
 ```
 
 ---
@@ -313,7 +315,7 @@ ANALYSE_RESULT(result, user_dir):
     DISPLAY ""
     DISPLAY "Export complete! All 12 data types extracted."
     DISPLAY "Data saved to: {user_dir}/raw/"
-    RETURN
+    RETURN "complete"
 
   # Check if rate limited
   rate_limited = "429" IN result OR "rate limit" IN result.lower()
@@ -334,6 +336,7 @@ ANALYSE_RESULT(result, user_dir):
 
     DISPLAY "Run this skill again in about 1 hour when the rate limit resets."
     DISPLAY "Progress is saved — it will pick up exactly where it left off."
+    RETURN "rate_limited"
 
   ELSE:
     DISPLAY ""
@@ -346,6 +349,7 @@ ANALYSE_RESULT(result, user_dir):
     DISPLAY "  - 400 errors: endpoint may not support the requested date range"
     DISPLAY ""
     DISPLAY "Run this skill again to retry the failed types."
+    RETURN "partial"
 ```
 
 ---
@@ -382,15 +386,52 @@ MAIN():
     HALT
 
   SELECT_USERS()
-  SELECT_TYPES()
 
-  # Gate: verify selections are populated
-  IF len(state.selected_users) == 0:
-    DISPLAY "No users selected for export."
-    HALT
-  IF state.type_flag IS null:
-    DISPLAY "No data types selected for export."
-    HALT
+  # Export loop: select types → extract → offer to continue
+  LOOP:
+    SELECT_TYPES()
 
-  EXTRACT()
+    # Gate: verify selections are populated
+    IF len(state.selected_users) == 0:
+      DISPLAY "No users selected for export."
+      HALT
+    IF state.type_flag IS null:
+      DISPLAY "No data types selected for export."
+      HALT
+
+    outcome = EXTRACT()
+
+    # If rate limited, don't offer to continue — they need to wait
+    IF outcome == "rate_limited":
+      BREAK
+
+    # Check if all types are now complete across all users
+    all_done = true
+    FOR user IN state.selected_users:
+      first_name = user.display_name.split()[0].lower()
+      user_dir = state.output_dir + "/" + user.user_id + "-" + first_name
+      checkpoint_raw = Read(user_dir + "/.checkpoint.json")
+      IF checkpoint_raw IS NOT empty:
+        checkpoint = JSON.parse(checkpoint_raw)
+        completed = checkpoint.completed OR []
+        IF len(completed) < len(ALL_TYPES):
+          all_done = false
+
+    IF all_done:
+      DISPLAY "All data types exported for all selected users!"
+      BREAK
+
+    # Offer to export more
+    again = AskUserQuestion(
+      question: "Export completed. Want to export more data types?",
+      header: "Continue",
+      options: [
+        { label: "Yes, choose more types", description: "Select additional types to export" },
+        { label: "No, I'm done", description: "Finish" }
+      ],
+      multiSelect: false
+    )
+
+    IF again == "No, I'm done":
+      BREAK
 ```
