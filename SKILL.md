@@ -167,12 +167,52 @@ SELECT_USERS(users):
 
 ---
 
-## Phase 4: Extract
+## Phase 4: Select Data Types
+
+Let the user choose which data types to export.
+
+```pseudocode
+SELECT_TYPES():
+  all_types = ["spo2", "breathing_rate", "skin_temperature", "hrv",
+               "weight", "sleep", "heart_rate_summary", "nutrition",
+               "activities", "activity_tcx", "daily_summary",
+               "heart_rate_intraday"]
+
+  selection = AskUserQuestion(
+    question: "Which data types do you want to export?",
+    header: "Data Types",
+    options: [
+      { label: "All types", description: "Export all 12 data types" },
+      { label: "Quick (light API usage)", description: "spo2, breathing_rate, skin_temperature, hrv, weight, sleep" },
+      { label: "Choose specific types", description: "Pick individual types from the list" }
+    ],
+    multiSelect: false
+  )
+
+  IF selection == "All types":
+    RETURN "--all"
+  ELIF selection == "Quick (light API usage)":
+    RETURN "--types spo2,breathing_rate,skin_temperature,hrv,weight,sleep"
+  ELSE:
+    chosen = AskUserQuestion(
+      question: "Select the data types to export:",
+      header: "Types",
+      options: [
+        { label: t, description: "" } FOR t IN all_types
+      ],
+      multiSelect: true
+    )
+    RETURN "--types " + ",".join(chosen)
+```
+
+---
+
+## Phase 5: Extract
 
 Run the extraction with progress monitoring.
 
 ```pseudocode
-EXTRACT(output_dir, users):
+EXTRACT(output_dir, users, type_flag):
   FOR user IN users:
     DISPLAY "Exporting {user.display_name} ({user.user_id})..."
     DISPLAY ""
@@ -193,7 +233,7 @@ EXTRACT(output_dir, users):
 
     # Run the export
     result = RUN(
-      "export --all --user {user.user_id} --output {output_dir}",
+      "export {type_flag} --user {user.user_id} --output {output_dir}",
       timeout: 600000  # 10 minutes max per run
     )
 
@@ -205,7 +245,7 @@ EXTRACT(output_dir, users):
 
 ---
 
-## Phase 5: Analyse and Advise
+## Phase 6: Analyse and Advise
 
 Parse the export result and advise the user on next steps.
 
@@ -280,5 +320,6 @@ MAIN():
   output_dir = OUTPUT_DIR()
   users      = AUTHENTICATE(output_dir)
   selected   = SELECT_USERS(users)
-  EXTRACT(output_dir, selected)
+  type_flag  = SELECT_TYPES()
+  EXTRACT(output_dir, selected, type_flag)
 ```
