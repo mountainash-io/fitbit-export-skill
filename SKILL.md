@@ -173,36 +173,34 @@ Let the user choose which data types to export.
 
 ```pseudocode
 SELECT_TYPES():
-  all_types = ["spo2", "breathing_rate", "skin_temperature", "hrv",
-               "weight", "sleep", "heart_rate_summary", "nutrition",
-               "activities", "activity_tcx", "daily_summary",
-               "heart_rate_intraday"]
-
   selection = AskUserQuestion(
     question: "Which data types do you want to export?",
     header: "Data Types",
     options: [
-      { label: "All types", description: "Export all 12 data types" },
-      { label: "Quick (light API usage)", description: "spo2, breathing_rate, skin_temperature, hrv, weight, sleep" },
-      { label: "Choose specific types", description: "Pick individual types from the list" }
+      { label: "All types",                description: "Export all 12 data types" },
+      { label: "Quick (light API usage)",   description: "spo2, breathing_rate, skin_temperature, hrv, weight, sleep" },
+      { label: "spo2",                      description: "Blood oxygen levels" },
+      { label: "breathing_rate",            description: "Nightly breathing rate" },
+      { label: "skin_temperature",          description: "Nightly skin temperature deviation" },
+      { label: "hrv",                       description: "Heart rate variability" },
+      { label: "weight",                    description: "Weight, BMI, body fat" },
+      { label: "sleep",                     description: "Sleep sessions with stages" },
+      { label: "heart_rate_summary",        description: "Daily resting HR and zones" },
+      { label: "nutrition",                 description: "Food and water logs" },
+      { label: "activities",                description: "Logged exercises and workouts" },
+      { label: "activity_tcx",              description: "GPS tracks (TCX files)" },
+      { label: "daily_summary",             description: "Steps, calories, distance, floors" },
+      { label: "heart_rate_intraday",       description: "Minute-by-minute HR (largest, slow)" }
     ],
-    multiSelect: false
+    multiSelect: true
   )
 
-  IF selection == "All types":
+  IF "All types" IN selection:
     RETURN "--all"
-  ELIF selection == "Quick (light API usage)":
+  ELIF "Quick (light API usage)" IN selection:
     RETURN "--types spo2,breathing_rate,skin_temperature,hrv,weight,sleep"
   ELSE:
-    chosen = AskUserQuestion(
-      question: "Select the data types to export:",
-      header: "Types",
-      options: [
-        { label: t, description: "" } FOR t IN all_types
-      ],
-      multiSelect: true
-    )
-    RETURN "--types " + ",".join(chosen)
+    RETURN "--types " + ",".join(selection)
 ```
 
 ---
