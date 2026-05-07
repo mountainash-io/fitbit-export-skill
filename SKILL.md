@@ -113,16 +113,20 @@ AUTHENTICATE():
   IF tokens IS empty:
     DISPLAY "No Fitbit accounts found. Let's connect your first account."
     DISPLAY ""
-    DISPLAY "A browser window will open for you to log into Fitbit."
+    DISPLAY "Before proceeding:"
+    DISPLAY "  1. Log into your Fitbit account at fitbit.com in your browser"
+    DISPLAY "  2. Make sure port 8080 is free locally (used for the OAuth callback)"
+    DISPLAY ""
+    DISPLAY "The tool will open a browser window to authorize API access."
     DISPLAY "After you authorize, you'll be redirected back automatically."
     DISPLAY ""
 
     confirm = AskUserQuestion(
-      question: "Ready to open the browser for Fitbit authorization?",
+      question: "Are you logged into fitbit.com and ready to authorize?",
       header: "Auth",
       options: [
-        { label: "Yes, open browser", description: "Opens fitbit.com login page" },
-        { label: "Not yet", description: "I need to do something first" }
+        { label: "Yes, I'm logged in", description: "Opens Fitbit authorization page" },
+        { label: "Not yet", description: "I need to log in first" }
       ],
       multiSelect: false
     )
@@ -151,7 +155,25 @@ AUTHENTICATE():
     )
 
     IF add_more == "Yes, add another":
-      DISPLAY "Log out of fitbit.com first if adding a different account."
+      DISPLAY "To add a different account:"
+      DISPLAY "  1. Log out of fitbit.com in your browser"
+      DISPLAY "  2. Log in as the new user"
+      DISPLAY "  3. Then confirm below"
+      DISPLAY ""
+
+      ready = AskUserQuestion(
+        question: "Are you logged into fitbit.com as the new user?",
+        header: "Auth",
+        options: [
+          { label: "Yes, ready", description: "Opens authorization for the new account" },
+          { label: "Skip", description: "Continue with existing accounts only" }
+        ],
+        multiSelect: false
+      )
+
+      IF ready == "Skip":
+        RETURN  # state.users already populated above
+
       RUN("add-user")
       state.users = DISCOVER_USERS()
 
