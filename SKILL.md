@@ -227,34 +227,27 @@ Let the user choose which data types to export. Sets `state.type_flag`.
 
 ```pseudocode
 SELECT_TYPES():
-  selection = AskUserQuestion(
+  chosen = AskUserQuestion(
     question: "Which data types do you want to export?",
     header: "Data Types",
     options: [
-      { label: "All types",                description: "Export all 12 data types" },
-      { label: "Quick (light API usage)",   description: "spo2, breathing_rate, skin_temperature, hrv, weight, sleep" },
-      { label: "spo2",                      description: "Blood oxygen levels" },
-      { label: "breathing_rate",            description: "Nightly breathing rate" },
-      { label: "skin_temperature",          description: "Nightly skin temperature deviation" },
-      { label: "hrv",                       description: "Heart rate variability" },
-      { label: "weight",                    description: "Weight, BMI, body fat" },
-      { label: "sleep",                     description: "Sleep sessions with stages" },
-      { label: "heart_rate_summary",        description: "Daily resting HR and zones" },
-      { label: "nutrition",                 description: "Food and water logs" },
-      { label: "activities",                description: "Logged exercises and workouts" },
-      { label: "activity_tcx",              description: "GPS tracks (TCX files)" },
-      { label: "daily_summary",             description: "Steps, calories, distance, floors" },
-      { label: "heart_rate_intraday",       description: "Minute-by-minute HR (largest, slow)" }
+      { label: "sleep",                description: "Sleep sessions with stages (deep, light, REM)" },
+      { label: "activities",            description: "All logged exercises and workouts" },
+      { label: "daily_summary",         description: "Steps, calories, distance, floors, active minutes" },
+      { label: "heart_rate_summary",    description: "Daily resting heart rate and HR zones" },
+      { label: "heart_rate_intraday",   description: "Minute-by-minute HR — largest dataset, uses most API calls" },
+      { label: "weight",               description: "Weight, BMI, and body fat logs" },
+      { label: "nutrition",            description: "Food and water logs" },
+      { label: "activity_tcx",         description: "GPS tracks (TCX files) for activities" },
+      { label: "hrv",                  description: "Heart rate variability" },
+      { label: "spo2",                 description: "Blood oxygen levels" },
+      { label: "breathing_rate",       description: "Nightly breathing rate" },
+      { label: "skin_temperature",     description: "Nightly skin temperature deviation" }
     ],
     multiSelect: true
   )
 
-  IF "All types" IN selection:
-    state.type_flag = "--all"
-  ELIF "Quick (light API usage)" IN selection:
-    state.type_flag = "--types spo2,breathing_rate,skin_temperature,hrv,weight,sleep"
-  ELSE:
-    state.type_flag = "--types " + ",".join(selection)
+  state.type_flag = "--types " + ",".join(chosen)
 ```
 
 ---
