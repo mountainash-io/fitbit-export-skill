@@ -20,9 +20,14 @@ npx skills add mountainash-io/fitbit-export-skill -a claude-code
 npx skills add mountainash-io/fitbit-export-skill -g
 ```
 
+## Requirements
+
+- [uv](https://docs.astral.sh/uv/) — the only prerequisite
+- **Port 8080 available locally** — authentication runs a temporary server on `localhost:8080` for the OAuth callback. The skill must run on a machine with a browser and local network access (not in a remote/cloud sandbox like claude.ai).
+
 ## How it works
 
-The skill uses [`uvx`](https://docs.astral.sh/uv/guides/tools/) to run the [fitbit-export](https://github.com/mountainash-io/fitbit-export) CLI directly from GitHub — no local clone or virtual environment needed. The only prerequisite is [uv](https://docs.astral.sh/uv/).
+The skill uses [`uvx`](https://docs.astral.sh/uv/guides/tools/) to run the [fitbit-export](https://github.com/mountainash-io/fitbit-export) CLI directly from GitHub — no local clone or virtual environment needed.
 
 ## Data types exported (12)
 
