@@ -347,8 +347,35 @@ MAIN():
 
   BOOTSTRAP()
   CHOOSE_OUTPUT_DIR()
+
+  # Gate: verify output directory is set and writable
+  IF state.output_dir IS null:
+    DISPLAY "No output directory selected."
+    HALT
+  dir_check = Bash("mkdir -p " + state.output_dir + " && test -w " + state.output_dir)
+  IF dir_check FAILS:
+    DISPLAY "Cannot write to {state.output_dir}. Check the path and permissions."
+    HALT
+
   AUTHENTICATE()
+
+  # Gate: verify at least one user was discovered
+  IF len(state.users) == 0:
+    DISPLAY "No authenticated Fitbit accounts found."
+    DISPLAY "The browser authorization may not have completed."
+    DISPLAY "Run this skill again to retry."
+    HALT
+
   SELECT_USERS()
   SELECT_TYPES()
+
+  # Gate: verify selections are populated
+  IF len(state.selected_users) == 0:
+    DISPLAY "No users selected for export."
+    HALT
+  IF state.type_flag IS null:
+    DISPLAY "No data types selected for export."
+    HALT
+
   EXTRACT()
 ```
